@@ -1,27 +1,33 @@
-# 👋 Hello, I'm Divya Machkure
+# 🔐 OTP Based Ration Distribution System
 
-## 🚀 My Projects
+## 📋 Project Overview
+An IoT-based automated ration distribution system using PIC16F877A microcontroller, RFID authentication, and GSM OTP verification to prevent corruption in public distribution systems.
 
-### 1. OTP Based Ration Distribution System
-- **Description:** IoT-based automated ration distribution using PIC16F877A, RFID, and GSM
-- **Technologies:** Embedded C, PIC Microcontroller, RFID, GSM, LCD, Keypad
-- **Features:** OTP verification, RFID authentication, SMS alerts
-- [View Project](https://github.com/divya-machkure22/OTP-Ration-System)
+## 🎯 Features
+- ✅ RFID card authentication
+- ✅ OTP via SMS verification  
+- ✅ Automated ration dispensing (Rice, Sugar, Oil)
+- ✅ 16x2 LCD display interface
+- ✅ 4x3 Matrix keypad for user input
+- ✅ GSM communication (SIM900 module)
+- ✅ Real-time balance tracking
+- ✅ Anti-theft alarm system
 
-### 2. Password Security System
-- **Description:** Secure password management system
-- **Technologies:** [Add technologies used]
-- [View Project](https://github.com/divya-machkure22/Password-Security)
+## 🛠️ Hardware Components
+| Component | Specification |
+|-----------|---------------|
+| Microcontroller | PIC16F877A |
+| RFID Reader | EM-18 (125KHz) |
+| GSM Module | SIM900 |
+| Display | 16x2 LCD |
+| Input | 4x3 Matrix Keypad |
+| Power Supply | 5V DC Regulated |
+| Relays | For motor control |
 
-## 📫 Contact Me
-- **Email:** [your-email@example.com]
-- **LinkedIn:** [your-linkedin-link]
-- **Resume:** [Download My Resume](link-to-your-resume)
+## 🔧 Software Used
+- **Compiler:** PIC C Compiler
+- **Simulation:** Proteus 7
+- **PCB Design:** Express PCB
+- **Programming:** PICKit 2 Programmer
 
-## 🛠️ Skills
-- Embedded Systems
-- C Programming
-- PIC Microcontroller
-- RFID & GSM
-- PCB Design
-- Proteus Simulation
+## 📁 Project Structure
