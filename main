@@ -1,0 +1,300 @@
+#include <16F877A.h>
+#device ADC=8
+#use delay(crystal=20000000)
+#use rs232(baud=9600, xmit=PIN_C6, rcv=PIN_C7)
+
+#include "lcd.h"
+#include "keypad.h"
+#include "rfid.h"
+#include "gsm.h"
+
+// Define pins
+#define BUZZER_PIN      PIN_B0
+#define RELAY_RICE      PIN_B1
+#define RELAY_SUGAR     PIN_B2
+#define RELAY_OIL       PIN_B3
+#define RFID_ENABLE     PIN_B4
+
+// Global variables
+char user_otp[7];
+char generated_otp[7];
+char rfid_tag[13];
+char mobile_number[11] = "9876543210"; // Default mobile number
+int rice_quantity = 0;
+int sugar_quantity = 0;
+int oil_quantity = 0;
+int authenticated = 0;
+
+// Function prototypes
+void system_init(void);
+void generate_otp(void);
+void send_otp_sms(void);
+void verify_otp(void);
+void distribute_ration(void);
+void buzzer_beep(int duration);
+void display_welcome_message(void);
+void display_enter_otp(void);
+void display_ration_distributed(void);
+void display_invalid_otp(void);
+
+void main()
+{
+    system_init();
+    display_welcome_message();
+    
+    while(TRUE)
+    {
+        authenticated = 0;
+        
+        // Wait for RFID tag
+        lcd_clear();
+        lcd_gotoxy(1,1);
+        printf(lcd_putc, "SCAN RFID TAG");
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "TO CONTINUE...");
+        
+        while(!rfid_read_tag(rfid_tag))
+        {
+            delay_ms(100);
+        }
+        
+        buzzer_beep(200);
+        lcd_clear();
+        lcd_gotoxy(1,1);
+        printf(lcd_putc, "TAG DETECTED");
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "GENERATING OTP");
+        delay_ms(2000);
+        
+        // Generate and send OTP
+        generate_otp();
+        send_otp_sms();
+        
+        // Ask for OTP input
+        display_enter_otp();
+        verify_otp();
+        
+        if(authenticated)
+        {
+            // Get ration quantities
+            lcd_clear();
+            lcd_gotoxy(1,1);
+            printf(lcd_putc, "ENTER QUANTITY:");
+            delay_ms(1000);
+            
+            // For simplicity, using fixed quantities
+            // In actual implementation, use keypad to input quantities
+            rice_quantity = 5;    // 5 kg
+            sugar_quantity = 2;   // 2 kg
+            oil_quantity = 1;     // 1 liter
+            
+            distribute_ration();
+            display_ration_distributed();
+            
+            // Send confirmation SMS
+            gsm_send_confirmation(mobile_number, rice_quantity, sugar_quantity, oil_quantity);
+        }
+        else
+        {
+            display_invalid_otp();
+            buzzer_beep(1000); // Long beep for invalid OTP
+        }
+        
+        delay_ms(3000);
+    }
+}
+
+void system_init()
+{
+    setup_adc_ports(NO_ANALOGS);
+    setup_adc(ADC_OFF);
+    setup_psp(PSP_DISABLED);
+    setup_spi(SPI_SS_DISABLED);
+    setup_timer_0(RTCC_INTERNAL|RTCC_DIV_1);
+    setup_timer_1(T1_DISABLED);
+    setup_timer_2(T2_DISABLED,0,1);
+    setup_comparator(NC_NC_NC_NC);
+    setup_vref(FALSE);
+    
+    // Initialize peripherals
+    lcd_init();
+    keypad_init();
+    rfid_init();
+    gsm_init();
+    
+    // Set pin directions
+    output_low(BUZZER_PIN);
+    output_low(RELAY_RICE);
+    output_low(RELAY_SUGAR);
+    output_low(RELAY_OIL);
+    output_high(RFID_ENABLE);
+    
+    buzzer_beep(100);
+}
+
+void generate_otp()
+{
+    int i;
+    // Generate 6-digit random OTP
+    srand(rand());
+    for(i = 0; i < 6; i++)
+    {
+        generated_otp[i] = (rand() % 10) + '0';
+    }
+    generated_otp[6] = '\0';
+    
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "OTP: %s", generated_otp);
+    delay_ms(2000);
+}
+
+void send_otp_sms()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "SENDING OTP...");
+    
+    if(gsm_send_otp(mobile_number, generated_otp))
+    {
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "OTP SENT");
+        buzzer_beep(300);
+    }
+    else
+    {
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "SMS FAILED");
+        buzzer_beep(1000);
+    }
+    delay_ms(2000);
+}
+
+void verify_otp()
+{
+    int i;
+    char key;
+    
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "ENTER OTP:");
+    lcd_gotoxy(1,2);
+    printf(lcd_putc, "____");
+    lcd_gotoxy(1,2);
+    
+    // Get OTP from keypad
+    for(i = 0; i < 6; i++)
+    {
+        do {
+            key = keypad_getkey();
+        } while(key == 0);
+        
+        user_otp[i] = key;
+        lcd_putc('*');
+        buzzer_beep(50);
+    }
+    user_otp[6] = '\0';
+    
+    // Verify OTP
+    authenticated = 1;
+    for(i = 0; i < 6; i++)
+    {
+        if(user_otp[i] != generated_otp[i])
+        {
+            authenticated = 0;
+            break;
+        }
+    }
+}
+
+void distribute_ration()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "DISTRIBUTING...");
+    
+    // Distribute rice
+    if(rice_quantity > 0)
+    {
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "RICE: %dkg", rice_quantity);
+        output_high(RELAY_RICE);
+        delay_ms(rice_quantity * 1000); // Simulate distribution time
+        output_low(RELAY_RICE);
+        delay_ms(500);
+    }
+    
+    // Distribute sugar
+    if(sugar_quantity > 0)
+    {
+        lcd_clear();
+        lcd_gotoxy(1,1);
+        printf(lcd_putc, "DISTRIBUTING...");
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "SUGAR: %dkg", sugar_quantity);
+        output_high(RELAY_SUGAR);
+        delay_ms(sugar_quantity * 1000);
+        output_low(RELAY_SUGAR);
+        delay_ms(500);
+    }
+    
+    // Distribute oil
+    if(oil_quantity > 0)
+    {
+        lcd_clear();
+        lcd_gotoxy(1,1);
+        printf(lcd_putc, "DISTRIBUTING...");
+        lcd_gotoxy(1,2);
+        printf(lcd_putc, "OIL: %dL", oil_quantity);
+        output_high(RELAY_OIL);
+        delay_ms(oil_quantity * 1000);
+        output_low(RELAY_OIL);
+        delay_ms(500);
+    }
+}
+
+void buzzer_beep(int duration)
+{
+    output_high(BUZZER_PIN);
+    delay_ms(duration);
+    output_low(BUZZER_PIN);
+}
+
+void display_welcome_message()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "OTP BASED RATION");
+    lcd_gotoxy(1,2);
+    printf(lcd_putc, "DISTRIBUTION SYS");
+    delay_ms(3000);
+}
+
+void display_enter_otp()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "ENTER OTP SENT");
+    lcd_gotoxy(1,2);
+    printf(lcd_putc, "TO YOUR MOBILE");
+    delay_ms(2000);
+}
+
+void display_ration_distributed()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "RATION");
+    lcd_gotoxy(1,2);
+    printf(lcd_putc, "DISTRIBUTED!");
+    buzzer_beep(500);
+}
+
+void display_invalid_otp()
+{
+    lcd_clear();
+    lcd_gotoxy(1,1);
+    printf(lcd_putc, "INVALID OTP!");
+    lcd_gotoxy(1,2);
+    printf(lcd_putc, "ACCESS DENIED");
+}
